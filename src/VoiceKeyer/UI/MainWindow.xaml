@@ -1,0 +1,71 @@
+<Window x:Class="VoiceKeyer.UI.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Voice Keyer" Icon="pack://application:,,,/VoiceKeyer;component/Assets/logo.ico" SizeToContent="WidthAndHeight" WindowStyle="None" AllowsTransparency="True"
+        Background="Transparent" Topmost="True" ResizeMode="NoResize" ShowInTaskbar="True"
+        FontFamily="Segoe UI" PreviewKeyDown="Window_PreviewKeyDown" Closing="Window_Closing">
+    <Border Background="{StaticResource BarBackground}" BorderBrush="{StaticResource BarBorder}"
+            BorderThickness="1" CornerRadius="8" Padding="4">
+        <StackPanel>
+            <StackPanel Orientation="Horizontal">
+                <Border x:Name="Grip" Width="18" Background="Transparent" Cursor="SizeAll"
+                        MouseLeftButtonDown="Grip_MouseLeftButtonDown" ToolTip="Drag to move">
+                    <TextBlock Text="&#x22EE;&#x22EE;" Foreground="{StaticResource DimBrush}" FontSize="16"
+                               HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                </Border>
+                <StackPanel x:Name="KeyPanel" Orientation="Horizontal"/>
+                <StackPanel Margin="4,0,4,0" VerticalAlignment="Center">
+                    <TextBlock Text="CALL" Foreground="{StaticResource DimBrush}" FontSize="10" HorizontalAlignment="Center"/>
+                    <TextBox x:Name="CallBox" Width="86" FontSize="15" FontWeight="SemiBold" Padding="2"
+                             CharacterCasing="Upper" MaxLength="16" HorizontalContentAlignment="Center"
+                             ToolTip="Callsign of the station you are working. {ICAO !} and {CALL} in a message use it."/>
+                </StackPanel>
+                <Button x:Name="VolumeButton" Style="{StaticResource KeyButton}" Width="48" Height="44"
+                        Click="Volume_Click" MouseWheel="Volume_MouseWheel"
+                        ToolTip="Sending volume (mouse wheel adjusts). Only changes what Voice Keyer sends; the sound card setting is untouched.">
+                    <StackPanel>
+                        <TextBlock Text="VOL" FontSize="10" Foreground="{StaticResource DimBrush}" HorizontalAlignment="Center"/>
+                        <TextBlock x:Name="VolumeText" FontSize="12" HorizontalAlignment="Center" Text="100%"/>
+                    </StackPanel>
+                </Button>
+                <Popup x:Name="VolumePopup" PlacementTarget="{Binding ElementName=VolumeButton}" Placement="Bottom"
+                       StaysOpen="False" Closed="VolumePopup_Closed">
+                    <Border Background="{StaticResource BarBackground}" BorderBrush="{StaticResource BarBorder}"
+                            BorderThickness="1" CornerRadius="6" Padding="12,10">
+                        <StackPanel>
+                            <TextBlock Text="Sending volume" Foreground="{StaticResource DimBrush}" FontSize="11" Margin="0,0,0,4"/>
+                            <Slider x:Name="VolumeSlider" Width="170" Minimum="0" Maximum="100" TickFrequency="5"
+                                    IsSnapToTickEnabled="True" SmallChange="5" LargeChange="10"
+                                    ValueChanged="VolumeSlider_ValueChanged" MouseWheel="Volume_MouseWheel"/>
+                        </StackPanel>
+                    </Border>
+                </Popup>
+                <Button Style="{StaticResource KeyButton}" Width="40" Height="44" Click="Stop_Click"
+                        ToolTip="Stop sending (Esc)" Foreground="#FF6B5B" FontSize="18" Content="&#x25A0;"/>
+                <Button x:Name="MenuButton" Style="{StaticResource IconKeyButton}" Width="40" Height="44"
+                        Click="Menu_Click" ToolTip="Settings and tools" FontSize="17" Content="&#xE713;"
+                        FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets">
+                    <Button.ContextMenu>
+                        <ContextMenu>
+                            <MenuItem Header="Settings..." Click="Settings_Click"/>
+                            <MenuItem x:Name="HrdCallItem" Header="Take callsign from HRD Logbook" IsCheckable="True"
+                                      ToolTip="Reads the callsign in HRD Logbook's open Add/Edit window into the CALL box. Read-only: nothing in HRD is changed."
+                                      Click="HrdCall_Click"/>
+                            <MenuItem x:Name="GlobalKeysItem" Header="F-keys work in any program" IsCheckable="True"
+                                      ToolTip="On: F1-F12 reach Voice Keyer even when another program has focus (that program no longer gets them). Off: only when Voice Keyer is focused."
+                                      Click="GlobalKeys_Click"/>
+                            <MenuItem Header="Load message file (.mc)..." Click="LoadMessageFile_Click"/>
+                            <MenuItem Header="Open message file in editor" Click="OpenMacroFile_Click"/>
+                            <MenuItem Header="Use Voice Keyer's own message file" Click="UseOwnMessageFile_Click"/>
+                            <MenuItem Header="Voice trainer (record your voice)..." Click="Trainer_Click"/>
+                            <Separator/>
+                            <MenuItem Header="Exit" Click="Exit_Click"/>
+                        </ContextMenu>
+                    </Button.ContextMenu>
+                </Button>
+            </StackPanel>
+            <TextBlock x:Name="StatusText" Foreground="{StaticResource DimBrush}" FontSize="11" Margin="22,2,4,0"
+                       Text="Ready" TextTrimming="CharacterEllipsis"/>
+        </StackPanel>
+    </Border>
+</Window>

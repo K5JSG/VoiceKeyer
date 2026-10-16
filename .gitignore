@@ -1,0 +1,16 @@
+# Build output
+bin/
+obj/
+publish/
+dist/
+
+# Visual Studio files (local to this machine)
+.vs/
+*.user
+
+# A personal trained voice must never be committed or packaged. Only the two stock
+# Piper voices in src/VoiceKeyer/Bundled/voices ship.
+*K5JSG*.onnx
+*K5JSG*.onnx.json
+*_voice.zip
+*_dataset.zip

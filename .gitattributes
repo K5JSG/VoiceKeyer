@@ -1,0 +1,5 @@
+# Never convert line endings in the bundled Piper engine, its data or the voices: they must reach the installer byte for byte.
+src/VoiceKeyer/Bundled/** -text
+*.onnx binary
+*.ico binary
+*.png binary

@@ -1,0 +1,45 @@
+name: Build and test
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Restore
+        run: dotnet restore VoiceKeyer.slnx
+
+      - name: Build
+        run: dotnet build VoiceKeyer.slnx --no-restore -c Debug
+
+      - name: Test
+        run: dotnet test VoiceKeyer.slnx --no-build -c Debug --logger "console;verbosity=normal"
+
+      # Compile the installer on every push too, so a broken installer script is
+      # caught here and not on release day. The file is kept for a week so it can
+      # be downloaded and tried out.
+      - name: Install Inno Setup
+        run: choco install innosetup -y --no-progress
+
+      - name: Build exe and installer
+        shell: pwsh
+        run: .\build.ps1 -SkipTests
+
+      - name: Keep the installer
+        uses: actions/upload-artifact@v7
+        with:
+          name: installer
+          path: dist/*-setup.exe
+          retention-days: 7
