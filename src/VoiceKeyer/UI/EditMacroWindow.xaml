@@ -11,7 +11,7 @@
         <TextBox x:Name="ScriptBox" Margin="0,2,0,6" Padding="4" TextWrapping="Wrap" AcceptsReturn="False"
                  MinHeight="64" VerticalScrollBarVisibility="Auto"/>
         <TextBlock Foreground="{StaticResource DimBrush}" TextWrapping="Wrap" FontSize="11.5" Margin="0,0,0,10"
-                   Text="{}{TTS text}  speak text in your voice     {TTSParms 0.7}  speed (lower = faster)     {ICAO !}  phonetic spelling of the call in the CALL box     {ICAO ABC}  phonetic spelling of ABC     {MYCALL} {OPERATOR} {ROVERQTH} {CALL}     Folder\file.wav  play a recording     {WIPE}  clear the CALL box"/>
+                   Text="{}{TTS text}  speak text in your voice     {TTSParms 0.7}  speed (lower = faster)     {ICAO !}  phonetic spelling of the call in the CALL box     {ICAO ABC}  phonetic spelling of ABC     {MYCALL} {OPERATOR} {ROVERQTH} {CALL}     {PARK} {PARK2} {PARKS}  POTA park reference(s) from Settings     Folder\file.wav  play a recording     {WIPE}  clear the CALL box"/>
         <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
             <Button Content="Preview" Width="80" Margin="0,0,8,0" Click="Preview_Click" ToolTip="Play it without keying the radio"/>
             <Button Content="Save" Width="80" Margin="0,0,8,0" IsDefault="True" Click="Save_Click"/>

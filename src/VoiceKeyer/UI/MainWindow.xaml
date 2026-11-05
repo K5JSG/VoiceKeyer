@@ -13,12 +13,26 @@
                     <TextBlock Text="&#x22EE;&#x22EE;" Foreground="{StaticResource DimBrush}" FontSize="16"
                                HorizontalAlignment="Center" VerticalAlignment="Center"/>
                 </Border>
+                <Button x:Name="ModeButton" Style="{StaticResource KeyButton}" Width="52" Height="44"
+                        Click="Mode_Click" ToolTip="Click to switch between RUN (calling CQ) and S&amp;P (search and pounce). Each has its own F1-F12 messages.">
+                    <StackPanel>
+                        <TextBlock Text="MODE" FontSize="10" Foreground="{StaticResource DimBrush}" HorizontalAlignment="Center"/>
+                        <TextBlock x:Name="ModeText" FontSize="13" FontWeight="SemiBold" HorizontalAlignment="Center" Text="RUN"/>
+                    </StackPanel>
+                </Button>
                 <StackPanel x:Name="KeyPanel" Orientation="Horizontal"/>
                 <StackPanel Margin="4,0,4,0" VerticalAlignment="Center">
                     <TextBlock Text="CALL" Foreground="{StaticResource DimBrush}" FontSize="10" HorizontalAlignment="Center"/>
                     <TextBox x:Name="CallBox" Width="86" FontSize="15" FontWeight="SemiBold" Padding="2"
                              CharacterCasing="Upper" MaxLength="16" HorizontalContentAlignment="Center"
                              ToolTip="Callsign of the station you are working. {ICAO !} and {CALL} in a message use it."/>
+                </StackPanel>
+                <StackPanel Margin="0,0,4,0" VerticalAlignment="Center">
+                    <TextBlock Text="PARK" Foreground="{StaticResource DimBrush}" FontSize="10" HorizontalAlignment="Center"/>
+                    <TextBox x:Name="ParkBox" Width="86" FontSize="15" FontWeight="SemiBold" Padding="2"
+                             CharacterCasing="Upper" MaxLength="40" HorizontalContentAlignment="Center"
+                             LostFocus="ParkBox_LostFocus"
+                             ToolTip="POTA park reference(s) you are activating, e.g. K-1234 (several: K-1234, K-5678). {PARK}, {PARK2} and {PARKS} in a message use it."/>
                 </StackPanel>
                 <Button x:Name="VolumeButton" Style="{StaticResource KeyButton}" Width="48" Height="44"
                         Click="Volume_Click" MouseWheel="Volume_MouseWheel"

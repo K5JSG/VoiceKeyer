@@ -26,6 +26,7 @@ public partial class SettingsWindow : Window
     private readonly TextBox _catOff = new();
     private readonly TextBox _myCall = new();
     private readonly TextBox _roverQth = new();
+    private readonly TextBox _parks = new();
     private readonly TextBox _operator = new();
     private readonly TextBox _wavFolder = new();
     private int _row;
@@ -42,6 +43,8 @@ public partial class SettingsWindow : Window
         Row("My callsign ({MYCALL})", _myCall);
         Row("Operator ({OPERATOR})", _operator);
         Row("Rover QTH ({ROVERQTH})", _roverQth);
+        Row("POTA park(s) ({PARK})", _parks,
+            hint: "Park reference(s) you are activating, e.g. K-1234 or K-1234, K-5678. {PARK} = first, {PARK2} = second, {PARKS} = all. Use {TTS into park {ICAO {PARK}}} to speak it.");
 
         Section("Voice (Piper text-to-speech)");
         Row("Voice folder", _voiceFolder, BrowseFolder(_voiceFolder));
@@ -81,6 +84,7 @@ public partial class SettingsWindow : Window
         _catOff.Text = _settings.CatOff;
         _myCall.Text = _settings.MyCall;
         _roverQth.Text = _settings.RoverQth;
+        _parks.Text = _settings.Parks;
         _operator.Text = _settings.Operator;
     }
 
@@ -114,6 +118,7 @@ public partial class SettingsWindow : Window
         _settings.CatOff = _catOff.Text;
         _settings.MyCall = _myCall.Text.Trim().ToUpperInvariant();
         _settings.RoverQth = _roverQth.Text.Trim().ToUpperInvariant();
+        _settings.Parks = _parks.Text.Trim().ToUpperInvariant();
         _settings.Operator = _operator.Text.Trim().ToUpperInvariant();
         DialogResult = true;
     }

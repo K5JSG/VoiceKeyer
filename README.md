@@ -12,7 +12,7 @@ Messages live in a plain-text function-key file (`.mc` format, one `F<n> label,m
 ## What it does
 
 - **F1 to F12 buttons** in a borderless, always-on-top bar. Drag the grip (the dots on the left) to move it; it remembers its position.
-- **Message files.** Gear menu > *Load message file (.mc)...* switches to any `.mc` file at once, *Open message file in editor* opens the current one, and *Use Voice Keyer's own message file* goes back to the built-in one. Only the first F1 to F12 block of a file is used (a second block, such as an old Search & Pounce set, is left untouched when you save).
+- **Message files.** Gear menu > *Load message file (.mc)...* switches to any `.mc` file at once, *Open message file in editor* opens the current one, and *Use Voice Keyer's own message file* goes back to the built-in one. The first F1 to F12 block is the RUN set (calling CQ) and the second is the Search & Pounce set (hunting). The MODE button on the bar switches between them and remembers the choice.
 - **CALL box** on the bar: the callsign of the station you are working. `{ICAO !}` and `{CALL}` in a message use it, and `{WIPE}` clears it. Type it, or let Voice Keyer take it from Ham Radio Deluxe (next item).
 - **Callsign from HRD Logbook (optional).** If you log with Ham Radio Deluxe, Voice Keyer copies the callsign from HRD Logbook's open Add or Edit window into the CALL box, within about a second of it changing. It reads the window through Windows UI Automation (the same interface screen readers use), so HRD needs no add-ons or settings, and it only reads: nothing in HRD is ever changed. A call you type by hand stays until HRD's changes again, and when HRD's box goes blank for a new QSO the CALL box clears. Untick *Take callsign from HRD Logbook* in the gear menu to turn it off. Voice Keyer works the same without HRD installed.
 - **Right-click a button** to edit its label and script, preview it without keying the radio, or open the whole message file in your editor. Edits made in an external editor are picked up automatically.
@@ -35,6 +35,7 @@ Message syntax:
 | `{ICAO ABC}` | NATO phonetic spelling of the literal text `ABC` |
 | `{MYCALL}` `{OPERATOR}` `{ROVERQTH}` `{CALL}` | Station call, operator and Rover QTH (all in Settings), and the call in the CALL box |
 | `Folder\file.wav` | Play a recording, relative to the *Wav folder* in Settings (`{OPERATOR}\Cq.wav`) |
+| `{PARK}` `{PARK2}` `{PARKS}` | POTA park reference(s) from the PARK box on the bar (or Settings): the first, the second, or all (`{TTS into park {ICAO {PARK}}}`) |
 | `{WIPE}` | Clear the CALL box |
 
 Anything else in braces is not supported and shows a warning in the status line.
@@ -56,7 +57,7 @@ Your settings, message file, voices and phrase cache live outside the program fo
    - *None*: the radio's VOX keys the transmitter.
    - *Serial RTS / DTR*: a serial port wired to the radio's PTT line. A port can only be open in one program, so pick one nothing else is using.
    - *CAT command*: sends an on/off string (default `TX1;` and `TX0;`) to the port. Check your radio's manual, and note the same port-sharing limit.
-5. Set **My callsign** (`{MYCALL}`), **Operator** (`{OPERATOR}`) and **Rover QTH** (`{ROVERQTH}`) if your messages use them.
+5. Set **My callsign** (`{MYCALL}`), **Operator** (`{OPERATOR}`) and **Rover QTH** (`{ROVERQTH}`) and **POTA park(s)** (`{PARK}`) if your messages use them.
 
 > Always test with **Preview** (right-click a button) first. Preview plays the message without keying the radio.
 

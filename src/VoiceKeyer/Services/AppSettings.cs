@@ -59,6 +59,18 @@ public sealed class AppSettings
 
     public string RoverQth { get; set; } = string.Empty;
 
+    /// <summary>Parks On The Air reference(s) being activated, separated by commas or spaces (e.g. "K-1234, K-5678").</summary>
+    public string Parks { get; set; } = string.Empty;
+
+    [JsonIgnore]
+    public IReadOnlyList<string> ParkList =>
+        Parks.Split([',', ';', ' '], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Select(park => park.ToUpperInvariant()).ToList();
+
+    /// <summary>Which message set the F-keys send: Run (calling CQ) or Search and Pounce (hunting).</summary>
+    [JsonConverter(typeof(JsonStringEnumConverter))]
+    public Macros.OperatingMode Mode { get; set; } = Macros.OperatingMode.Run;
+
     /// <summary>Folder that relative .wav paths in messages are resolved against.</summary>
     public string WavFolder { get; set; } = string.Empty;
 

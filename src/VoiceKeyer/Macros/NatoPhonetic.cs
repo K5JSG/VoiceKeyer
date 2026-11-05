@@ -15,7 +15,7 @@ public static class NatoPhonetic
         ['Z'] = "Zulu",
         ['0'] = "Zero", ['1'] = "One", ['2'] = "Two", ['3'] = "Three", ['4'] = "Four",
         ['5'] = "Five", ['6'] = "Six", ['7'] = "Seven", ['8'] = "Eight", ['9'] = "Nine",
-        ['/'] = "Stroke", ['-'] = "Dash", ['.'] = "Point",
+        ['/'] = "Stroke", ['.'] = "Point",
     };
 
     /// <summary>
@@ -25,17 +25,22 @@ public static class NatoPhonetic
     public static string Spell(string text)
     {
         var builder = new StringBuilder();
+        bool pause = false;
         foreach (char c in text.ToUpperInvariant())
         {
             if (!Words.TryGetValue(c, out string? word))
             {
+                // A comma or space between items (e.g. two park references) is a real pause.
+                pause |= builder.Length > 0 && (c == ',' || c == ';' || char.IsWhiteSpace(c));
                 continue;
             }
 
             if (builder.Length > 0)
             {
-                builder.Append(' ');
+                builder.Append(pause ? ", " : " ");
             }
+
+            pause = false;
 
             builder.Append(word);
         }

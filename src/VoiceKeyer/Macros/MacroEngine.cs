@@ -15,6 +15,9 @@ public interface IMacroContext
 
     string RoverQth { get; }
 
+    /// <summary>The Parks On The Air reference(s) being activated, e.g. "K-1234" (more than one for a two-fer).</summary>
+    IReadOnlyList<string> Parks { get; }
+
     /// <summary>Folder that relative .wav paths in macros are resolved against (the Wav folder in Settings).</summary>
     string WavFolder { get; }
 
@@ -173,6 +176,16 @@ public static class MacroEngine
                 return true;
             case "ROVERQTH":
                 value = context.RoverQth;
+                return true;
+            case "PARK":
+            case "PARKREF":
+                value = context.Parks.FirstOrDefault() ?? string.Empty;
+                return true;
+            case "PARK2":
+                value = context.Parks.Skip(1).FirstOrDefault() ?? string.Empty;
+                return true;
+            case "PARKS":
+                value = string.Join(", ", context.Parks);
                 return true;
             case "ICAO":
                 string source = ExpandText(argument.Trim(), context);

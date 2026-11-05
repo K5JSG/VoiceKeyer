@@ -34,7 +34,9 @@ public sealed class MessageSender : IMacroContext
 
     public string RoverQth => _settings.RoverQth;
 
-    public string WavFolder => _settings.WavFolder;
+    public IReadOnlyList<string> Parks => _settings.ParkList;
+
+    public string WavFolder =>_settings.WavFolder;
 
     public double DefaultLengthScale => _settings.DefaultLengthScale;
 

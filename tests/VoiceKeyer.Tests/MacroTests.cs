@@ -10,6 +10,7 @@ public sealed class MacroTests
         public string Operator { get; init; } = "K5JSG";
         public string EntryCall { get; init; } = "K2AB";
         public string RoverQth { get; init; } = "MON";
+        public IReadOnlyList<string> Parks { get; init; } = ["K-1234", "K-5678"];
         public string WavFolder { get; init; } = @"C:\Keyer\Wav";
         public double DefaultLengthScale { get; init; } = 1.0;
     }
@@ -73,6 +74,20 @@ public sealed class MacroTests
 
         Assert.Equal("Kilo Two Alpha Bravo", ((SpeakAction)actions[0]).Text);
         Assert.Equal("Alpha Lima Lima & Charlie Alpha Tango", ((SpeakAction)actions[1]).Text);
+    }
+
+    [Fact]
+    public void Expand_ParkMacros()
+    {
+        var actions = MacroEngine.Expand("{TTS into park {ICAO {PARK}} and {PARK2}, all {PARKS}}", new FakeContext());
+
+        Assert.Equal("into park Kilo One Two Three Four and K-5678, all K-1234, K-5678", ((SpeakAction)Assert.Single(actions)).Text);
+    }
+
+    [Fact]
+    public void Icao_PausesBetweenSeparatedItems()
+    {
+        Assert.Equal("Kilo One, Kilo Two", NatoPhonetic.Spell("K1, K2"));
     }
 
     [Fact]

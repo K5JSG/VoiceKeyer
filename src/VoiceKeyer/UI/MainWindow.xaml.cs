@@ -61,6 +61,7 @@ public partial class MainWindow : Window
         {
             VolumeSlider.Value = _settings.OutputVolumePercent;
             ShowVolume();
+            ShowMode();
             ApplySettings();
             ApplyHotKeys();
             ApplyHrd();
@@ -213,8 +214,31 @@ public partial class MainWindow : Window
         ApplyHotKeys();
     }
 
-    /// <summary>One profile: the first F1 to F12 block of the message file. (A second block in the file is left untouched.)</summary>
-    private const OperatingMode Mode = OperatingMode.Run;
+    /// <summary>Run uses the first F1 to F12 block of the message file, Search and Pounce the second.</summary>
+    private OperatingMode Mode => _settings.Mode;
+
+    private void ParkBox_LostFocus(object sender, RoutedEventArgs e)
+    {
+        string parks = ParkBox.Text.Trim();
+        if (parks != _settings.Parks)
+        {
+            _settings.Parks = parks;
+            _settings.Save();
+            LoadMacros();
+        }
+    }
+
+    private void ShowMode() =>
+        ModeText.Text = Mode == OperatingMode.Run ? "RUN" : "S&P";
+
+    private void Mode_Click(object sender, RoutedEventArgs e)
+    {
+        _settings.Mode = Mode == OperatingMode.Run ? OperatingMode.SearchAndPounce : OperatingMode.Run;
+        _settings.Save();
+        ShowMode();
+        LoadMacros();
+        StatusText.Text = Mode == OperatingMode.Run ? "RUN messages" : "Search & Pounce messages";
+    }
 
     private void PlaceWindow()
     {
@@ -237,6 +261,7 @@ public partial class MainWindow : Window
     {
         _synthesizer.PiperExe = AppSettings.PiperExe;
         _synthesizer.ModelPath = _settings.VoiceModelPath;
+        ParkBox.Text = _settings.Parks;
         WatchMacroFile();
         LoadMacros();
         if (!File.Exists(_synthesizer.PiperExe))
