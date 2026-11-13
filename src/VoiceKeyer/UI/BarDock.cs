@@ -57,10 +57,118 @@ public sealed class BarDock : IDisposable
         Edge = DockEdge.None;
         if (_registered)
         {
-            var data = NewData();
-            SHAppBarMessage(AbmRemove, ref data);
+            KeepIcons(() =>
+            {
+                var data = NewData();
+                SHAppBarMessage(AbmRemove, ref data);
+            });
             _registered = false;
         }
+    }
+
+    /// <summary>Finishes once the desktop icons have been put back after the last dock or undock (wait for it before exiting).</summary>
+    public Task IconsSettled { get; private set; } = Task.CompletedTask;
+
+    // Where icons were before the strip pushed them aside, so they go back there when it is given back.
+    private readonly Dictionary<string, DesktopIcons.Icon> _pushedAside = [];
+    // The layout being put back right now (a dock or undock in the meantime starts from it, not from Explorer's reshuffle).
+    private DesktopIcons.Layout? _pending;
+    private int _generation;
+
+    /// <summary>
+    /// Runs a change to the reserved strip without disturbing the desktop icons. When the work area changes, Explorer
+    /// re-lays the icons, and when it grows back it restores an old saved layout, so moving icons while Voice Keyer is
+    /// docked or closed sends them "all over the place". The layout is read first and put back once Explorer is done; only
+    /// icons under the strip move, to the nearest clear spot, and they return to their own spot when the strip goes away.
+    /// </summary>
+    private void KeepIcons(Action change)
+    {
+        DesktopIcons.Layout? layout = _pending ?? DesktopIcons.Read();
+        bool hadBefore = TryGetMonitor(out _, out Rect32 before);
+        change();
+        if (layout is null || !hadBefore || !TryGetMonitor(out Rect32 monitor, out Rect32 work) || work.Same(before))
+        {
+            return;
+        }
+
+        _pending = Arrange(layout, monitor, work);
+        IconsSettled = PutBackAsync(_pending, ++_generation);
+    }
+
+    private DesktopIcons.Layout Arrange(DesktopIcons.Layout layout, Rect32 monitor, Rect32 work)
+    {
+        var targets = new Dictionary<string, DesktopIcons.Icon>(layout.Icons);
+        int w = layout.CellWidth, h = layout.CellHeight;
+        int slack = Math.Min(h / 4, 12);
+        bool Fits(int x, int y) =>
+            x >= work.Left - slack && y >= work.Top - slack && x + w <= work.Right + slack && y + h <= work.Bottom + slack;
+        bool OnMonitor(DesktopIcons.Icon icon) =>
+            icon.X + w / 2 >= monitor.Left && icon.X + w / 2 < monitor.Right && icon.Y + h / 2 >= monitor.Top && icon.Y + h / 2 < monitor.Bottom;
+        bool Free(string key, int x, int y) =>
+            targets.All(other => other.Key == key || Math.Abs(other.Value.X - x) >= w || Math.Abs(other.Value.Y - y) >= h);
+
+        // Icons the strip pushed aside go back to their own spot once it is clear again.
+        foreach (var (key, original) in _pushedAside.ToList())
+        {
+            if (!targets.ContainsKey(key))
+            {
+                _pushedAside.Remove(key);
+            }
+            else if (Fits(original.X, original.Y) && Free(key, original.X, original.Y))
+            {
+                targets[key] = original;
+                _pushedAside.Remove(key);
+            }
+        }
+
+        // Icons now under the strip move to the nearest clear spot on the icon grid.
+        foreach (var (key, icon) in targets.ToList())
+        {
+            if (!OnMonitor(icon) || Fits(icon.X, icon.Y))
+            {
+                continue;
+            }
+
+            DesktopIcons.Icon? best = null;
+            long bestDistance = long.MaxValue;
+            for (int row = -30; row <= 30; row++)
+            {
+                for (int column = -30; column <= 30; column++)
+                {
+                    int x = icon.X + column * w, y = icon.Y + row * h;
+                    long distance = (long)column * column * w * w + (long)row * row * h * h;
+                    if (distance < bestDistance && Fits(x, y) && Free(key, x, y))
+                    {
+                        (best, bestDistance) = (icon with { X = x, Y = y }, distance);
+                    }
+                }
+            }
+
+            if (best is not null)
+            {
+                _pushedAside.TryAdd(key, icon);
+                targets[key] = best;
+            }
+        }
+
+        return layout with { Icons = targets };
+    }
+
+    /// <summary>Explorer re-lays the icons a moment after the work area changes, so the layout is applied a few times.</summary>
+    private async Task PutBackAsync(DesktopIcons.Layout layout, int generation)
+    {
+        foreach (int delay in (int[])[250, 500, 750, 1500])
+        {
+            await Task.Delay(delay);
+            if (generation != _generation)
+            {
+                return;
+            }
+
+            DesktopIcons.Apply(layout.Icons.Values);
+        }
+
+        _pending = null;
     }
 
     /// <summary>After a drag: docks or snaps to whatever edge the bar was dropped near.</summary>
@@ -154,7 +262,7 @@ public sealed class BarDock : IDisposable
                 data.Rect.Top = data.Rect.Bottom - height;
             }
 
-            SHAppBarMessage(AbmSetPos, ref data);
+            KeepIcons(() => SHAppBarMessage(AbmSetPos, ref data));
             Move(AlignedLeft(data.Rect, bar), data.Rect.Top);
         }
         finally
@@ -247,6 +355,9 @@ public sealed class BarDock : IDisposable
         public readonly int Width => Right - Left;
 
         public readonly int Height => Bottom - Top;
+
+        public readonly bool Same(Rect32 other) =>
+            Left == other.Left && Top == other.Top && Right == other.Right && Bottom == other.Bottom;
     }
 
     [StructLayout(LayoutKind.Sequential)]

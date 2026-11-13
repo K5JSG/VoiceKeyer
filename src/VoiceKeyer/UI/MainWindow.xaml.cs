@@ -513,8 +513,23 @@ public partial class MainWindow : Window
 
     private void Exit_Click(object sender, RoutedEventArgs e) => Close();
 
-    private void Window_Closing(object? sender, System.ComponentModel.CancelEventArgs e)
+    private bool _iconsPutBack;
+
+    private async void Window_Closing(object? sender, System.ComponentModel.CancelEventArgs e)
     {
+        if (_dock is { Edge: not DockEdge.None } && !_iconsPutBack)
+        {
+            // Give the strip back first and wait (hidden) until the desktop icons are back in place, then close for real.
+            e.Cancel = true;
+            _sender.Stop();
+            Hide();
+            _dock.Undock();
+            await _dock.IconsSettled;
+            _iconsPutBack = true;
+            Close();
+            return;
+        }
+
         _sender.Stop();
         _hrdTimer.Stop();
         _hotKeys?.Dispose();
