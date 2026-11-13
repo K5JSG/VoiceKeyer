@@ -4,22 +4,25 @@ using System.Windows.Automation;
 
 namespace VoiceKeyer.Services;
 
+/// <summary>What HRD's open Add/Edit window holds. Empty strings mean the boxes are blank.</summary>
+public sealed record HrdQso(string Call, string RstSent);
+
 /// <summary>
-/// Reads the callsign from Ham Radio Deluxe Logbook's Add / Edit window through Windows UI Automation
+/// Reads the callsign and the report sent from Ham Radio Deluxe Logbook's Add / Edit window through Windows UI Automation
 /// (the interface screen readers use), so HRD needs no add-ons or settings. Read-only: Keyer never changes HRD.
-/// Same approach as the Callsign Lookup app; the field is the "edtCALL" box of HRD's "HRDLBEdit" window.
+/// Same approach as the Callsign Lookup app; the fields are the "edtCALL" box and the "cbxRST_SENT" combo box of HRD's "HRDLBEdit" window.
 /// </summary>
 public static class HrdLink
 {
     private const string WindowId = "QApplication.HRDLBEdit";
     private const string CallId = WindowId + ".edtCALL";
+    private const string RstSentId = WindowId + ".cbxRST_SENT";
 
     /// <summary>
-    /// The callsign in HRD's open Add/Edit window, upper case. An empty string means a window is open with the call box
-    /// blank; null means HRD Logbook is not running or has no such window open (or could not be read right now).
-    /// Blocks on HRD, so call it off the UI thread.
+    /// The callsign (upper case) and report sent in HRD's open Add/Edit window. Null means HRD Logbook is not running or has
+    /// no such window open (or could not be read right now). Blocks on HRD, so call it off the UI thread.
     /// </summary>
-    public static string? ReadCallsign()
+    public static HrdQso? ReadQso()
     {
         try
         {
@@ -29,15 +32,16 @@ public static class HrdLink
                 {
                     var byProcess = new PropertyCondition(AutomationElement.ProcessIdProperty, process.Id);
                     var isEditWindow = new PropertyCondition(AutomationElement.AutomationIdProperty, WindowId);
-                    var isCallBox = new PropertyCondition(AutomationElement.AutomationIdProperty, CallId);
                     foreach (AutomationElement top in AutomationElement.RootElement.FindAll(TreeScope.Children, byProcess))
                     {
                         // Qt reports the Edit window as a child of the main logbook window rather than as a window of its own.
                         var window = top.FindFirst(TreeScope.Subtree, isEditWindow);
-                        var box = window?.FindFirst(TreeScope.Descendants, isCallBox);
-                        if (box is not null && box.TryGetCurrentPattern(ValuePattern.Pattern, out object pattern))
+                        string? call = window is null ? null : ReadBox(window, CallId);
+                        if (call is not null)
                         {
-                            return ((ValuePattern)pattern).Current.Value.Trim().ToUpperInvariant();
+                            // RST Sent is a combo box; its text lives in the line edit inside it (the combo itself may not expose a value).
+                            string rst = ReadBox(window!, RstSentId + ".QLineEdit") ?? ReadBox(window!, RstSentId) ?? string.Empty;
+                            return new HrdQso(call.ToUpperInvariant(), rst);
                         }
                     }
                 }
@@ -49,5 +53,13 @@ public static class HrdLink
         }
 
         return null;
+    }
+
+    private static string? ReadBox(AutomationElement window, string automationId)
+    {
+        var box = window.FindFirst(TreeScope.Descendants, new PropertyCondition(AutomationElement.AutomationIdProperty, automationId));
+        return box is not null && box.TryGetCurrentPattern(ValuePattern.Pattern, out object pattern)
+            ? ((ValuePattern)pattern).Current.Value.Trim()
+            : null;
     }
 }

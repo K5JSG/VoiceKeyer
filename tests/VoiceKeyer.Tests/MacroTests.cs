@@ -11,6 +11,7 @@ public sealed class MacroTests
         public string EntryCall { get; init; } = "K2AB";
         public string RoverQth { get; init; } = "MON";
         public IReadOnlyList<string> Parks { get; init; } = ["K-1234", "K-5678"];
+        public string SentRst { get; init; } = string.Empty;
         public string WavFolder { get; init; } = @"C:\Keyer\Wav";
         public double DefaultLengthScale { get; init; } = 1.0;
     }
@@ -81,7 +82,31 @@ public sealed class MacroTests
     {
         var actions = MacroEngine.Expand("{TTS into park {ICAO {PARK}} and {PARK2}, all {PARKS}}", new FakeContext());
 
-        Assert.Equal("into park Kilo One Two Three Four and K-5678, all K-1234, K-5678", ((SpeakAction)Assert.Single(actions)).Text);
+        Assert.Equal("into park Kilo One Two Three Four and K five six seven eight, all K one two three four, K five six seven eight",
+            ((SpeakAction)Assert.Single(actions)).Text);
+    }
+
+    [Fact]
+    public void Expand_ParkIsSpokenDigitByDigit()
+    {
+        var actions = MacroEngine.Expand("{TTS park number {PARK}}", new FakeContext { Parks = ["US-2038"] });
+
+        Assert.Equal("park number U S two zero three eight", ((SpeakAction)Assert.Single(actions)).Text);
+    }
+
+    [Fact]
+    public void Expand_SentRstFromHrdOrDefault59()
+    {
+        Assert.Equal("You are five seven",
+            ((SpeakAction)Assert.Single(MacroEngine.Expand("{TTS You are {SENTRST}}", new FakeContext { SentRst = "57" }))).Text);
+        Assert.Equal("You are five nine",
+            ((SpeakAction)Assert.Single(MacroEngine.Expand("{TTS You are {SENTRST}}", new FakeContext()))).Text);
+        Assert.Equal("You are five nine plus 10",
+            ((SpeakAction)Assert.Single(MacroEngine.Expand("{TTS You are {SENTRST}}", new FakeContext { SentRst = "59+10dB" }))).Text);
+        Assert.Equal("You are five nine plus 20",
+            ((SpeakAction)Assert.Single(MacroEngine.Expand("{TTS You are {SENTRST}}", new FakeContext { SentRst = "59 +20 DB" }))).Text);
+        Assert.Equal("You are five nine plus",
+            ((SpeakAction)Assert.Single(MacroEngine.Expand("{TTS You are {SENTRST}}", new FakeContext { SentRst = "59+" }))).Text);
     }
 
     [Fact]

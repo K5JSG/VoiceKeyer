@@ -18,6 +18,9 @@ public interface IMacroContext
     /// <summary>The Parks On The Air reference(s) being activated, e.g. "K-1234" (more than one for a two-fer).</summary>
     IReadOnlyList<string> Parks { get; }
 
+    /// <summary>The signal report being sent, e.g. "59" (read from HRD's Add/Edit window when available).</summary>
+    string SentRst { get; }
+
     /// <summary>Folder that relative .wav paths in macros are resolved against (the Wav folder in Settings).</summary>
     string WavFolder { get; }
 
@@ -137,7 +140,11 @@ public static class MacroEngine
     }
 
     /// <summary>Substitutes variables in a text argument (the part inside {TTS ...}).</summary>
-    public static string ExpandText(string text, IMacroContext context)
+    /// <param name="spoken">
+    /// True (the default) gives park references and reports in a form Piper reads digit by digit ("U S two zero three eight");
+    /// false gives the raw value, which {ICAO} needs so it can spell it.
+    /// </param>
+    public static string ExpandText(string text, IMacroContext context, bool spoken = true)
     {
         var builder = new StringBuilder();
         foreach (var (isMacro, content) in Tokenize(text))
@@ -146,7 +153,7 @@ public static class MacroEngine
             {
                 builder.Append(content);
             }
-            else if (TryVariable(content, context, out string value))
+            else if (TryVariable(content, context, out string value, spoken))
             {
                 builder.Append(value);
             }
@@ -159,7 +166,7 @@ public static class MacroEngine
         return builder.ToString();
     }
 
-    private static bool TryVariable(string content, IMacroContext context, out string value)
+    private static bool TryVariable(string content, IMacroContext context, out string value, bool spoken = true)
     {
         var (name, argument) = SplitMacro(content);
         switch (name.ToUpperInvariant())
@@ -179,22 +186,75 @@ public static class MacroEngine
                 return true;
             case "PARK":
             case "PARKREF":
-                value = context.Parks.FirstOrDefault() ?? string.Empty;
+                value = Say(context.Parks.FirstOrDefault() ?? string.Empty, spoken);
                 return true;
             case "PARK2":
-                value = context.Parks.Skip(1).FirstOrDefault() ?? string.Empty;
+                value = Say(context.Parks.Skip(1).FirstOrDefault() ?? string.Empty, spoken);
                 return true;
             case "PARKS":
-                value = string.Join(", ", context.Parks);
+                value = string.Join(", ", context.Parks.Select(park => Say(park, spoken)));
+                return true;
+            case "SENTRST":
+            case "RST":
+                string rst = CleanReport(context.SentRst);
+                value = spoken ? SayReport(rst.Length > 0 ? rst : "59") : rst.Length > 0 ? rst : "59";
                 return true;
             case "ICAO":
-                string source = ExpandText(argument.Trim(), context);
+                string source = ExpandText(argument.Trim(), context, spoken: false);
                 value = NatoPhonetic.Spell(source == "!" ? context.EntryCall : source);
                 return true;
             default:
                 value = string.Empty;
                 return false;
         }
+    }
+
+    private static string Say(string value, bool spoken) => spoken ? SpellOut(value) : value;
+
+    /// <summary>HRD's RST Sent as sent on the air: "59+10dB" becomes "59+10" (spaces and the dB unit dropped).</summary>
+    private static string CleanReport(string report) =>
+        report.Replace("dB", string.Empty, StringComparison.OrdinalIgnoreCase).Replace(" ", string.Empty);
+
+    /// <summary>
+    /// "59" becomes "five nine", "59+" becomes "five nine plus" and "59+10" becomes "five nine plus 10": the report digit
+    /// by digit, the amount over S9 as a number ("plus ten", as it is said on the air).
+    /// </summary>
+    public static string SayReport(string report)
+    {
+        int plus = report.IndexOf('+');
+        if (plus < 0)
+        {
+            return SpellOut(report);
+        }
+
+        string over = new(report[(plus + 1)..].Where(char.IsAsciiDigit).ToArray());
+        string spoken = SpellOut(report[..plus]);
+        // A bare "59+" is said as "five nine plus".
+        return over.Length > 0 ? $"{spoken} plus {int.Parse(over, CultureInfo.InvariantCulture)}" : $"{spoken} plus";
+    }
+
+    private static readonly string[] DigitWords = ["zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine"];
+
+    /// <summary>
+    /// "US-2038" becomes "U S two zero three eight" and "59" becomes "five nine": Piper would otherwise read the digits as a
+    /// number ("two thousand thirty eight") and say "dash". Letters are spaced out so they are read one at a time.
+    /// </summary>
+    public static string SpellOut(string text)
+    {
+        var words = new List<string>();
+        foreach (char c in text.ToUpperInvariant())
+        {
+            if (char.IsAsciiDigit(c))
+            {
+                words.Add(DigitWords[c - '0']);
+            }
+            else if (char.IsAsciiLetter(c))
+            {
+                words.Add(c.ToString());
+            }
+        }
+
+        return string.Join(' ', words);
     }
 
     private static string ResolveWav(string path, string wavFolder) =>

@@ -36,6 +36,9 @@ public sealed class MessageSender : IMacroContext
 
     public IReadOnlyList<string> Parks => _settings.ParkList;
 
+    /// <summary>Report sent, copied from HRD's Add/Edit window by the bar; blank means {SENTRST} says 59.</summary>
+    public string SentRst { get; set; } = string.Empty;
+
     public string WavFolder =>_settings.WavFolder;
 
     public double DefaultLengthScale => _settings.DefaultLengthScale;

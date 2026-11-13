@@ -66,6 +66,7 @@ public partial class MainWindow : Window
             ApplyHotKeys();
             ApplyHrd();
         };
+        ContentRendered += (_, _) => RestoreDock();
         PlaceWindow();
     }
 
@@ -157,8 +158,15 @@ public partial class MainWindow : Window
         _hrdReading = true;
         try
         {
-            string? call = await Task.Run(HrdLink.ReadCallsign);
-            if (call is null || call == _lastHrdCall || !_settings.HrdCallsign)
+            HrdQso? qso = await Task.Run(HrdLink.ReadQso);
+            if (qso is null || !_settings.HrdCallsign)
+            {
+                return;
+            }
+
+            _sender.SentRst = qso.RstSent;
+            string call = qso.Call;
+            if (call == _lastHrdCall)
             {
                 return;
             }
@@ -409,7 +417,37 @@ public partial class MainWindow : Window
         }
     }
 
-    private void Grip_MouseLeftButtonDown(object sender, MouseButtonEventArgs e) => DragMove();
+    /// <summary>
+    /// Drag the bar by its grip. Dropped near the top or bottom (just above the taskbar) it docks there and maximized
+    /// windows make room for it; dropped near a side or the middle it snaps there.
+    /// </summary>
+    private void Grip_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        _dock ??= new BarDock(this);
+        _dock.Undock();
+        DragMove();
+        _dock.SnapAfterDrag();
+        _settings.DockEdge = _dock.Edge;
+        _settings.DockAlign = _dock.Align;
+        StatusText.Text = _dock.Edge switch
+        {
+            DockEdge.Bottom => "Docked above the taskbar (drag the grip to undock)",
+            DockEdge.Top => "Docked at the top of the screen (drag the grip to undock)",
+            _ => StatusText.Text,
+        };
+    }
+
+    private BarDock? _dock;
+
+    /// <summary>Docks the bar again where it was last time Voice Keyer ran (needs the window's final size).</summary>
+    private void RestoreDock()
+    {
+        if (_settings.DockEdge != DockEdge.None)
+        {
+            _dock ??= new BarDock(this);
+            _dock.Dock(_settings.DockEdge, _settings.DockAlign);
+        }
+    }
 
     private void Stop_Click(object sender, RoutedEventArgs e) => _sender.Stop();
 
@@ -481,6 +519,9 @@ public partial class MainWindow : Window
         _hrdTimer.Stop();
         _hotKeys?.Dispose();
         _watcher?.Dispose();
+
+        // Give the reserved strip back; the saved DockEdge docks the bar again at the next start.
+        _dock?.Dispose();
         if (IsLoaded && double.IsFinite(Left) && double.IsFinite(Top))
         {
             _settings.WindowLeft = Left;

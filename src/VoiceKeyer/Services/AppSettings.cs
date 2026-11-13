@@ -82,6 +82,14 @@ public sealed class AppSettings
 
     public double? WindowTop { get; set; }
 
+    /// <summary>Screen edge the bar is docked to (space reserved so maximized windows stay clear of it), or None.</summary>
+    [JsonConverter(typeof(JsonStringEnumConverter))]
+    public UI.DockEdge DockEdge { get; set; } = UI.DockEdge.None;
+
+    /// <summary>Where along the edge the bar sits (left, centre, right, or wherever it was dropped).</summary>
+    [JsonConverter(typeof(JsonStringEnumConverter))]
+    public UI.DockAlign DockAlign { get; set; } = UI.DockAlign.Free;
+
     public static string DataFolder { get; } = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "VoiceKeyer");
 

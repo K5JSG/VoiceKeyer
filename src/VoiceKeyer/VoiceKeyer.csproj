@@ -10,7 +10,7 @@
     <Product>Voice Keyer</Product>
     <AssemblyTitle>Voice Keyer</AssemblyTitle>
     <Company>K5JSG</Company>
-    <Version>1.1.0</Version>
+    <Version>1.2.0</Version>
     <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
     <ApplicationIcon>Assets\logo.ico</ApplicationIcon>
   </PropertyGroup>
