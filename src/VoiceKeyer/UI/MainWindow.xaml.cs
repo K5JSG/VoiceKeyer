@@ -21,6 +21,7 @@ public partial class MainWindow : Window
     private FileSystemWatcher? _watcher;
     private MacroFile _macros = MacroFile.CreateDefault();
     private CancellationTokenSource? _prerender;
+    private readonly DispatcherTimer _prerenderDelay = new() { Interval = TimeSpan.FromMilliseconds(500) };
 
     public MainWindow()
     {
@@ -56,6 +57,15 @@ public partial class MainWindow : Window
         };
 
         _sender.SendingChanged += OnSendingChanged;
+
+        // Render the messages for the callsign in the box while the operator is still working the contact, so the
+        // function keys play at once. Waits for a pause in typing so half-typed calls are not rendered.
+        _prerenderDelay.Tick += (_, _) => StartPrerender();
+        CallBox.TextChanged += (_, _) =>
+        {
+            _prerenderDelay.Stop();
+            _prerenderDelay.Start();
+        };
 
         Loaded += (_, _) =>
         {
@@ -164,7 +174,13 @@ public partial class MainWindow : Window
                 return;
             }
 
-            _sender.SentRst = qso.RstSent;
+            if (_sender.SentRst != qso.RstSent)
+            {
+                _sender.SentRst = qso.RstSent;
+                _prerenderDelay.Stop();
+                _prerenderDelay.Start();
+            }
+
             string call = qso.Call;
             if (call == _lastHrdCall)
             {
@@ -334,9 +350,17 @@ public partial class MainWindow : Window
             button.Opacity = entry.IsEmpty ? 0.4 : 1;
         }
 
+        StartPrerender();
+    }
+
+    /// <summary>Renders every message in the current mode for the callsign now in the box (cached phrases are skipped).</summary>
+    private void StartPrerender()
+    {
+        _prerenderDelay.Stop();
         _prerender?.Cancel();
         _prerender = new CancellationTokenSource();
-        _ = _sender.PrerenderAsync(_macros.Entries(Mode).Where(e => !e.IsEmpty).Select(e => e.Message), _prerender.Token);
+        string call = CallBox.Text.Trim().ToUpperInvariant();
+        _ = _sender.PrerenderAsync(_macros.Entries(Mode).Where(e => !e.IsEmpty).Select(e => e.Message), call, _prerender.Token);
     }
 
     /// <summary>Button caption, with the {MYCALL} and {OPERATOR} placeholders filled in.</summary>
@@ -534,6 +558,8 @@ public partial class MainWindow : Window
         _hrdTimer.Stop();
         _hotKeys?.Dispose();
         _watcher?.Dispose();
+        _prerender?.Cancel();
+        _synthesizer.Dispose(); // stops the resident piper.exe
 
         // Give the reserved strip back; the saved DockEdge docks the bar again at the next start.
         _dock?.Dispose();

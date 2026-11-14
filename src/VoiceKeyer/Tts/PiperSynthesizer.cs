@@ -11,9 +11,12 @@ namespace VoiceKeyer.Tts;
 /// Renders text to a wav file with piper.exe (the engine bundled with Keyer, with a Piper .onnx voice model).
 /// Results are cached on disk, so a phrase is only synthesized once per voice and setting.
 /// </summary>
-public sealed class PiperSynthesizer
+public sealed class PiperSynthesizer : IDisposable
 {
     private readonly string _cacheFolder;
+    private readonly Dictionary<string, Task<string>> _inFlight = new();
+    private readonly List<(string Key, PiperWorker Worker)> _workers = [];
+    private const int MaxWorkers = 3;
 
     public PiperSynthesizer(string cacheFolder)
     {
@@ -44,11 +47,114 @@ public sealed class PiperSynthesizer
             return path;
         }
 
-        string temp = path + ".tmp";
-        await RunPiperAsync(action, temp, cancellationToken).ConfigureAwait(false);
-        WavTrimmer.TrimSilence(temp, path);
-        File.Delete(temp);
-        return path;
+        // One render per phrase: a key pressed while the same phrase is still being prepared in the background
+        // waits for that render instead of starting another. Cancelling only stops the wait; the render finishes
+        // and is cached for next time.
+        Task<string> render;
+        lock (_inFlight)
+        {
+            if (!_inFlight.TryGetValue(path, out render!))
+            {
+                render = Task.Run(() => RenderToCacheAsync(action, path));
+                _inFlight[path] = render;
+            }
+        }
+
+        return await render.WaitAsync(cancellationToken).ConfigureAwait(false);
+    }
+
+    private async Task<string> RenderToCacheAsync(SpeakAction action, string path)
+    {
+        try
+        {
+            string temp = path + ".tmp";
+            try
+            {
+                await GetWorker(action).RenderAsync(action.Text, temp, CancellationToken.None).ConfigureAwait(false);
+            }
+            catch (Exception ex) when (ex is InvalidOperationException or TimeoutException or IOException)
+            {
+                // The resident piper failed; drop it and render this phrase the slow way, which reports a real error.
+                DropWorker(action);
+                await RunPiperAsync(action, temp, CancellationToken.None).ConfigureAwait(false);
+            }
+
+            WavTrimmer.TrimSilence(temp, path);
+            File.Delete(temp);
+            return path;
+        }
+        finally
+        {
+            lock (_inFlight)
+            {
+                _inFlight.Remove(path);
+            }
+        }
+    }
+
+    private string WorkerKey(SpeakAction action)
+    {
+        var info = new FileInfo(ModelPath!);
+        return string.Create(CultureInfo.InvariantCulture,
+            $"{ModelPath}|{info.Length}|{info.LastWriteTimeUtc.Ticks}|{action.LengthScale}|{action.NoiseScale}|{action.NoiseW}");
+    }
+
+    /// <summary>The running piper for this voice and speech settings, started (and kept) on first use.</summary>
+    private PiperWorker GetWorker(SpeakAction action)
+    {
+        string key = WorkerKey(action);
+        lock (_workers)
+        {
+            int index = _workers.FindIndex(w => w.Key == key);
+            if (index >= 0 && _workers[index].Worker.IsAlive)
+            {
+                return _workers[index].Worker;
+            }
+
+            if (index >= 0)
+            {
+                _workers[index].Worker.Dispose();
+                _workers.RemoveAt(index);
+            }
+
+            while (_workers.Count >= MaxWorkers)
+            {
+                _workers[0].Worker.Dispose();
+                _workers.RemoveAt(0);
+            }
+
+            var worker = PiperWorker.Start(PiperExe, ModelPath!, action.LengthScale, action.NoiseScale, action.NoiseW);
+            _workers.Add((key, worker));
+            return worker;
+        }
+    }
+
+    private void DropWorker(SpeakAction action)
+    {
+        string key = WorkerKey(action);
+        lock (_workers)
+        {
+            int index = _workers.FindIndex(w => w.Key == key);
+            if (index >= 0)
+            {
+                _workers[index].Worker.Dispose();
+                _workers.RemoveAt(index);
+            }
+        }
+    }
+
+    /// <summary>Stops the resident piper.exe processes.</summary>
+    public void Dispose()
+    {
+        lock (_workers)
+        {
+            foreach (var (_, worker) in _workers)
+            {
+                worker.Dispose();
+            }
+
+            _workers.Clear();
+        }
     }
 
     private string CacheKey(SpeakAction action)

@@ -64,4 +64,20 @@ public sealed class VoicePackageTests : IDisposable
     {
         Assert.Throws<FileNotFoundException>(() => VoicePackage.Export(_root, "Nope", Path.Combine(_root, "x.zip")));
     }
+
+    [Fact]
+    public void Import_DropsMultiCharacterPhonemesThatTheBundledPiperRejects()
+    {
+        string from = Path.Combine(_root, "trained");
+        Directory.CreateDirectory(from);
+        File.WriteAllBytes(Path.Combine(from, "Me.onnx"), [1]);
+        File.WriteAllText(Path.Combine(from, "Me.onnx.json"),
+            "{\"audio\":{\"sample_rate\":22050},\"phoneme_id_map\":{\"a\":[14],\"a\u026a\":[161],\"\u026a\":[102]}}");
+        string to = Path.Combine(_root, "voices");
+
+        VoicePackage.Import(Path.Combine(from, "Me.onnx"), to);
+
+        var map = System.Text.Json.Nodes.JsonNode.Parse(File.ReadAllText(Path.Combine(to, "Me.onnx.json")))!["phoneme_id_map"]!.AsObject();
+        Assert.Equal(["a", "ɪ"], map.Select(entry => entry.Key));
+    }
 }

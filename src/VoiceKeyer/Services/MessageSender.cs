@@ -124,23 +124,56 @@ public sealed class MessageSender : IMacroContext
         }
     }
 
-    /// <summary>Renders every speakable phrase in the macro file ahead of time so the first press is instant.</summary>
-    public async Task PrerenderAsync(IEnumerable<string> messages, CancellationToken cancellationToken)
+    /// <summary>
+    /// Renders every speakable phrase ahead of time, as it will be spoken for <paramref name="entryCall"/>, so pressing a
+    /// key finds it already in the cache and plays at once. A couple of phrases render at a time.
+    /// </summary>
+    public async Task PrerenderAsync(IEnumerable<string> messages, string entryCall, CancellationToken cancellationToken)
     {
         try
         {
-            foreach (string message in messages)
+            var context = new CallSnapshot(this, entryCall);
+            var phrases = messages.SelectMany(message => MacroEngine.Expand(message, context).OfType<SpeakAction>())
+                .DistinctBy(speak => (speak.Text, speak.LengthScale, speak.NoiseScale, speak.NoiseW))
+                .ToList();
+            using var slots = new SemaphoreSlim(2);
+            await Task.WhenAll(phrases.Select(async speak =>
             {
-                foreach (var speak in MacroEngine.Expand(message, this).OfType<SpeakAction>())
+                await slots.WaitAsync(cancellationToken).ConfigureAwait(false);
+                try
                 {
                     await _synthesizer.RenderAsync(speak, cancellationToken).ConfigureAwait(false);
                 }
-            }
+                finally
+                {
+                    slots.Release();
+                }
+            })).ConfigureAwait(false);
         }
         catch (Exception ex) when (ex is OperationCanceledException or IOException or InvalidOperationException)
         {
             // Pre-rendering is only an optimisation; the real send reports any problem.
         }
+    }
+
+    /// <summary>The sender's settings with a given callsign in the box, so phrases can be rendered before a key is pressed.</summary>
+    private sealed class CallSnapshot(MessageSender sender, string entryCall) : IMacroContext
+    {
+        public string MyCall => sender.MyCall;
+
+        public string Operator => sender.Operator;
+
+        public string EntryCall { get; } = entryCall;
+
+        public string RoverQth => sender.RoverQth;
+
+        public IReadOnlyList<string> Parks => sender.Parks;
+
+        public string SentRst => sender.SentRst;
+
+        public string WavFolder => sender.WavFolder;
+
+        public double DefaultLengthScale => sender.DefaultLengthScale;
     }
 
     private async Task PlayKeyedAsync(List<string> files, bool key, CancellationToken cancellationToken)

@@ -116,6 +116,14 @@ public sealed class MacroTests
     }
 
     [Fact]
+    public void Icao_SaysPopPawForPapaInsideACallButNotAfterStroke()
+    {
+        Assert.Equal("Kilo Delta Two Pop-paw Quebec Pop-paw", NatoPhonetic.Spell("KD2PQP"));
+        Assert.Equal("Whiskey Zero Pop-paw Echo", NatoPhonetic.Spell("W0PE"));
+        Assert.Equal("Kilo Five Juliet Sierra Golf Stroke Papa", NatoPhonetic.Spell("K5JSG/P"));
+    }
+
+    [Fact]
     public void Expand_WavPathResolvesAgainstWavFolder()
     {
         var actions = MacroEngine.Expand(@"{OPERATOR}\Cq.wav", new FakeContext());

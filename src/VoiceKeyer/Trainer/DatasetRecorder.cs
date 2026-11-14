@@ -119,10 +119,121 @@ public sealed class DatasetRecorder
         zip.CreateEntryFromFile(MetadataPath, "metadata.csv");
         foreach (string wav in Directory.EnumerateFiles(WavFolder, "*.wav"))
         {
-            zip.CreateEntryFromFile(wav, "wavs/" + Path.GetFileName(wav));
+            // The recordings on disk stay as they were; only the copies in the zip are raised to a healthy level.
+            var entry = zip.CreateEntry("wavs/" + Path.GetFileName(wav), CompressionLevel.Optimal);
+            using var stream = entry.Open();
+            byte[] bytes = LevelledWav(wav);
+            stream.Write(bytes, 0, bytes.Length);
         }
 
         return zipPath;
+    }
+
+    /// <summary>Peak the exported clips are raised to (about -3 dBFS); clips already at or above it are left alone.</summary>
+    public const double TargetPeak = 0.7;
+
+    /// <summary>Most gain a clip may get (18 dB), so a nearly empty clip is not turned into loud noise.</summary>
+    public const double MaxGainDb = 18;
+
+    /// <summary>
+    /// Scales a quiet clip up so its loudest sample reaches <see cref="TargetPeak"/>. Nothing else is changed:
+    /// no EQ, no noise removal. A headset on a plain USB sound adapter records low, and Piper trains better on
+    /// clips at a normal level.
+    /// </summary>
+    public static float[] LevelUp(float[] samples)
+    {
+        double peak = samples.Length == 0 ? 0 : samples.Max(Math.Abs);
+        if (peak <= 1e-4 || peak >= TargetPeak)
+        {
+            return samples;
+        }
+
+        double gain = Math.Min(TargetPeak / peak, Math.Pow(10, MaxGainDb / 20));
+        var scaled = new float[samples.Length];
+        for (int i = 0; i < samples.Length; i++)
+        {
+            scaled[i] = (float)Math.Clamp(samples[i] * gain, -1.0, 1.0);
+        }
+
+        return scaled;
+    }
+
+    /// <summary>Corner of the gentle rumble filter applied to exported clips.</summary>
+    public const double HighPassHz = 75;
+
+    /// <summary>
+    /// Second-order Butterworth high-pass (12 dB/octave) that removes desk and mouth-pop rumble below speech,
+    /// so it neither wastes level headroom nor gets learned by the voice. Applied before the peak is measured.
+    /// </summary>
+    public static float[] HighPass(float[] samples)
+    {
+        double w0 = 2 * Math.PI * HighPassHz / SampleRate;
+        double alpha = Math.Sin(w0) / (2 * Math.Sqrt(0.5));
+        double cos = Math.Cos(w0);
+        double a0 = 1 + alpha;
+        double b0 = (1 + cos) / 2 / a0;
+        double b1 = -(1 + cos) / a0;
+        double b2 = b0;
+        double a1 = -2 * cos / a0;
+        double a2 = (1 - alpha) / a0;
+
+        var output = new float[samples.Length];
+        double x1 = 0, x2 = 0, y1 = 0, y2 = 0;
+        for (int i = 0; i < samples.Length; i++)
+        {
+            double x = samples[i];
+            double y = b0 * x + b1 * x1 + b2 * x2 - a1 * y1 - a2 * y2;
+            output[i] = (float)y;
+            x2 = x1;
+            x1 = x;
+            y2 = y1;
+            y1 = y;
+        }
+
+        return output;
+    }
+
+    private static byte[] LevelledWav(string path)
+    {
+        float[] samples;
+        using (var reader = new WaveFileReader(path))
+        {
+            var provider = reader.ToSampleProvider();
+            var all = new List<float>((int)(reader.Length / 2));
+            var buffer = new float[4096];
+            int read;
+            while ((read = provider.Read(buffer)) > 0)
+            {
+                all.AddRange(buffer.AsSpan(0, read).ToArray());
+            }
+
+            samples = all.ToArray();
+        }
+
+        samples = LevelUp(HighPass(samples));
+        using var memory = new MemoryStream(44 + samples.Length * 2);
+        using (var writer = new BinaryWriter(memory, Encoding.ASCII, leaveOpen: true))
+        {
+            int dataBytes = samples.Length * 2;
+            writer.Write("RIFF"u8);
+            writer.Write(36 + dataBytes);
+            writer.Write("WAVEfmt "u8);
+            writer.Write(16);
+            writer.Write((short)1);
+            writer.Write((short)1);
+            writer.Write(SampleRate);
+            writer.Write(SampleRate * 2);
+            writer.Write((short)2);
+            writer.Write((short)16);
+            writer.Write("data"u8);
+            writer.Write(dataBytes);
+            foreach (float sample in samples)
+            {
+                writer.Write((short)Math.Clamp(Math.Round(sample * 32767.0), -32768, 32767));
+            }
+        }
+
+        return memory.ToArray();
     }
 
     private static float[] ToFloat(byte[] pcm)

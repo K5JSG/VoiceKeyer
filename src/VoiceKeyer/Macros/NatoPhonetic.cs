@@ -19,13 +19,15 @@ public static class NatoPhonetic
     };
 
     /// <summary>
+    /// <paramref name="respellPapa"/> is true for speech and false when the text is a script for a person to read aloud.
     /// Returns e.g. "Kilo Two Alpha Bravo" for "K2AB". Unknown characters are skipped. The words are joined with plain
     /// spaces: commas make Piper pause and lift its pitch at every word, which sounds choppy and runs about 25% longer.
     /// </summary>
-    public static string Spell(string text)
+    public static string Spell(string text, bool respellPapa = true)
     {
         var builder = new StringBuilder();
         bool pause = false;
+        char previous = ' ';
         foreach (char c in text.ToUpperInvariant())
         {
             if (!Words.TryGetValue(c, out string? word))
@@ -42,7 +44,10 @@ public static class NatoPhonetic
 
             pause = false;
 
-            builder.Append(word);
+            // The trained headset voice squashes "Papa" to "pa" inside a call sign, but says "Pop-paw" cleanly. The
+            // "stroke Papa" at the end of a /P call was recorded and is fine as it is.
+            builder.Append(respellPapa && c == 'P' && previous != '/' ? "Pop-paw" : word);
+            previous = c;
         }
 
         return builder.ToString();

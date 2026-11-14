@@ -4,7 +4,8 @@ namespace VoiceKeyer.Trainer;
 
 /// <summary>
 /// The sentences a speaker reads to train a voice: general English for natural prosody, plus the phonetics,
-/// numbers and contest phrases a radio operator's macros actually use.
+/// numbers and contest phrases a radio operator's macros actually use. The list is built around the speaker's own
+/// call sign (from Settings) so anyone can train a voice that says their own call and other people's calls well.
 /// </summary>
 public static class PromptLibrary
 {
@@ -119,44 +120,151 @@ public static class PromptLibrary
         "Five nine eight nine zero.",
     ];
 
-    private static readonly string[] SampleCalls =
+    /// <summary>
+    /// Other stations' calls, each spelled in phonetics on its own line and used in reports. Between them every letter
+    /// and digit is covered several times, in the prefix, the middle and the suffix, and "Papa" is spelled in many
+    /// positions: a voice trained with a call sign only ever ending in "stroke Papa" squashes a Papa inside a call to "pa".
+    /// </summary>
+    public static readonly string[] SampleCalls =
     [
-        "K5JSG", "W2R", "N1MM", "K2AB", "W3CD", "N1EF", "K8GH", "W9IJ", "KA1BC", "WB2DE", "N4FG", "AA5HI",
-        "K7JK", "W6LM", "N0NO", "KD9PQ", "WA3RS", "K1TU", "N5VW", "W8XY", "KB6ZA", "AB4CD", "K9EF", "W0GH",
+        "K1AB", "W2CD", "N3EF", "K4GH", "W5IJ", "N6KL", "K7MN", "W8OP", "N9QR", "K0ST", "WA1UV", "KB2WX",
+        "N4YZ", "AA5BC", "KD6DE", "WB7FG", "KC8HI", "N0JK", "W3LM", "K9NO", "K5X", "WA9Y", "N2XJ", "KJ3ZW",
+        "W4JQ", "K8UQ", "W6VT", "N1ZX", "KF0YV", "AB4CS",
+        "KD2PQP", "W0PE", "K4PQE", "N8PAP", "WP4PA", "K6QPP", "W1PPA", "AA7P", "N5P", "K2PW", "W9QPR",
+        "KP4PX", "W3PG", "N7PD", "K1PA", "WB5PEP",
     ];
 
-    /// <summary>Builds the full reading list (about 250 lines, 15 to 20 minutes of speech).</summary>
-    public static IReadOnlyList<string> Build()
+    /// <summary>Contest and activity names for the "CQ x, CQ x, CQ x" loops. Spell any acronym the way it is said aloud.</summary>
+    private static readonly string[] CqNames =
+    [
+        "contest", "DX", "POTA", "Sweepstakes", "Field Day", "test", "QRP", "state QSO party",
+    ];
+
+    private static readonly string[] States =
+    [
+        "Alabama, Alaska, Arizona, Arkansas, California.",
+        "Colorado, Connecticut, Delaware, Florida, Georgia.",
+        "Hawaii, Idaho, Illinois, Indiana, Iowa.",
+        "Kansas, Kentucky, Louisiana, Maine, Maryland.",
+        "Massachusetts, Michigan, Minnesota, Mississippi, Missouri.",
+        "Montana, Nebraska, Nevada, New Hampshire, New Jersey.",
+        "New Mexico, New York, North Carolina, North Dakota, Ohio.",
+        "Oklahoma, Oregon, Pennsylvania, Rhode Island, South Carolina.",
+        "South Dakota, Tennessee, Texas, Utah, Vermont.",
+        "Virginia, Washington, West Virginia, Wisconsin, Wyoming.",
+    ];
+
+    private static readonly string[] Reports =
+    [
+        "Five nine plus ten.", "Five nine plus twenty.", "Five nine, thank you.", "You are five seven.",
+        "You are five nine plus.", "Your report is five nine, my report is five nine.", "Five by nine.", "Four and five.",
+    ];
+
+    private static readonly string[] ParkLines =
+    [
+        "You are five nine into park K one two three four.",
+        "You are five nine into park K five six seven eight.",
+        "You are five nine into park K nine nine zero zero.",
+        "Park to park, you are five nine from park K two four six eight.",
+        "Thank you for the park, seventy three.",
+        "Activating park U S two zero six eight today.",
+        "Activating park U S eight five four eight today.",
+        "I am in park K zero zero one three, with fifty watts.",
+        "Thanks for the park to park contact, good luck with the hunters.",
+        "Hunters, please stand by, I am calling CQ POTA.",
+    ];
+
+    private static string Spelled(string call) =>
+        NatoPhonetic.Spell(call, respellPapa: false).Replace(",", string.Empty);
+
+    /// <summary>
+    /// Builds the full reading list (about 300 lines, 18 to 22 minutes of speech). <paramref name="myCall"/> is the
+    /// speaker's own call (blank gives a list without it); <paramref name="extraPhrases"/> are the speaker's own lines,
+    /// such as a local contest, county names or a town that is hard to pronounce, written the way they are said aloud.
+    /// The most useful lines come first, so a short session still gives a usable voice.
+    /// </summary>
+    public static IReadOnlyList<string> Build(string myCall = "", IEnumerable<string>? extraPhrases = null)
     {
         var prompts = new List<string>();
-        prompts.AddRange(General);
+        string call = (myCall ?? string.Empty).Trim().ToUpperInvariant();
+        string[] spelledCalls = SampleCalls.Select(Spelled).ToArray();
 
-        string[] spelledCalls = SampleCalls.Select(NatoPhonetic.Spell).Select(s => s.Replace(",", string.Empty)).ToArray();
-        prompts.AddRange(Phrases.Select((p, i) => p.Replace("{C}", spelledCalls[i % spelledCalls.Length])));
-
-        // Callsigns in phonetics, one per line, rotated so every letter and digit is covered several times.
-        foreach (string call in SampleCalls)
+        // 1. The speaker's own call, which the keyer sends most.
+        if (call.Length > 0)
         {
-            prompts.Add(NatoPhonetic.Spell(call).Replace(",", string.Empty) + ".");
+            string me = Spelled(call);
+            string Other(int i) => spelledCalls[(i * 7 + 3) % spelledCalls.Length];
+            prompts.Add(me + ".");
+            prompts.Add($"This is {me}.");
+            prompts.Add($"{me}, {me}.");
+            prompts.Add($"{me}, calling CQ.");
+            prompts.Add($"QRZ, this is {me}.");
+            prompts.Add($"{me}, QRZ?");
+            if (!call.Contains('/'))
+            {
+                prompts.Add($"{me} stroke Papa.");
+                prompts.Add($"{me} stroke Mike.");
+                prompts.Add($"{me} stroke Quebec Romeo Papa.");
+                prompts.Add($"This is {me} stroke Papa.");
+                prompts.Add($"{me} stroke Papa, {me} stroke Papa.");
+            }
+
+            for (int i = 0; i < CqNames.Length; i++)
+            {
+                string name = CqNames[i];
+                string sign = call.Contains('/') || i % 2 == 0 ? me : $"{me} stroke Papa";
+                prompts.Add($"CQ {name}. CQ {name}. CQ {name}. {sign}.");
+                prompts.Add($"CQ {name}, CQ {name}, this is {sign}, {sign}.");
+            }
+
+            for (int i = 0; i < 6; i++)
+            {
+                prompts.Add($"{Other(i)}, you are five nine, thank you, {me}.");
+                prompts.Add($"Thank you {Other(i + 10)}, seventy three, {me}, QRZ?");
+            }
+
+            prompts.Add($"{me}, five nine, five nine.");
+            prompts.Add($"{me}, you are five nine plus ten, thank you.");
         }
 
+        // 2. Other stations' calls: alone, then inside sentences, so every letter works at the start, middle and end.
+        prompts.AddRange(spelledCalls.Select(c => c + "."));
+        for (int i = 0; i < spelledCalls.Length; i++)
+        {
+            prompts.Add($"{spelledCalls[i]}, you are five nine {NumberWords(i * 37 + 12)}.");
+            if (SampleCalls[i].Contains('P'))
+            {
+                prompts.Add($"Thank you {spelledCalls[i]}, seventy three.");
+                prompts.Add($"{spelledCalls[i]}, go ahead, I hear you well.");
+            }
+        }
+
+        // 3. Contest phrases, reports and numbers.
+        prompts.AddRange(Phrases.Select((p, i) => p.Replace("{C}", spelledCalls[i % spelledCalls.Length])));
+        prompts.AddRange(Reports);
+        prompts.AddRange(ParkLines);
+
+        // 4. The alphabet and digits in groups of five.
         string letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
         for (int i = 0; i < 26; i += 5)
         {
-            prompts.Add(NatoPhonetic.Spell(letters.Substring(i, Math.Min(5, 26 - i))).Replace(",", string.Empty) + ".");
+            prompts.Add(Spelled(letters.Substring(i, Math.Min(5, 26 - i))) + ".");
         }
 
         for (int i = 0; i < 10; i += 5)
         {
-            prompts.Add(NatoPhonetic.Spell("0123456789".Substring(i, 5)).Replace(",", string.Empty) + ".");
+            prompts.Add(Spelled("0123456789".Substring(i, 5)) + ".");
         }
 
-        // Callsigns with report numbers, as spoken in a contest.
-        for (int i = 0; i < spelledCalls.Length; i++)
+        prompts.AddRange(States);
+
+        // 5. The speaker's own lines, then ordinary English for natural rhythm.
+        if (extraPhrases is not null)
         {
-            prompts.Add($"{spelledCalls[i]}, you are five nine {NumberWords(i * 37 + 12)}.");
+            prompts.AddRange(extraPhrases.Select(l => l.Trim()).Where(l => l.Length > 0));
         }
 
+        prompts.AddRange(General);
         return prompts;
     }
 

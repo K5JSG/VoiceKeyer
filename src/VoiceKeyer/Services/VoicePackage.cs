@@ -1,4 +1,7 @@
 using System.IO.Compression;
+using System.Text.Encodings.Web;
+using System.Text.Json;
+using System.Text.Json.Nodes;
 
 namespace VoiceKeyer.Services;
 
@@ -47,6 +50,7 @@ public static class VoicePackage
         string target = Path.Combine(voiceFolder, Path.GetFileName(onnxPath));
         File.Copy(onnxPath, target, overwrite: true);
         File.Copy(config, target + ".json", overwrite: true);
+        RemoveMultiCharacterPhonemes(target + ".json");
         return [Path.GetFileNameWithoutExtension(target)];
     }
 
@@ -68,6 +72,7 @@ public static class VoicePackage
             string target = Path.Combine(voiceFolder, model.Name);
             model.ExtractToFile(target, overwrite: true);
             config.ExtractToFile(target + ".json", overwrite: true);
+            RemoveMultiCharacterPhonemes(target + ".json");
             added.Add(Path.GetFileNameWithoutExtension(target));
         }
 
@@ -77,5 +82,43 @@ public static class VoicePackage
         }
 
         return added;
+    }
+
+    /// <summary>
+    /// Voices trained with the current Piper trainer list diphthongs such as "aɪ" as one phoneme. The Piper engine bundled with
+    /// Voice Keyer only accepts single characters there and stops with "is not a single codepoint", so those entries are dropped
+    /// (it then speaks the two characters separately, as it does for every older voice). Returns how many were removed.
+    /// </summary>
+    public static int RemoveMultiCharacterPhonemes(string configPath)
+    {
+        JsonNode? root;
+        try
+        {
+            root = JsonNode.Parse(File.ReadAllText(configPath));
+        }
+        catch (JsonException)
+        {
+            return 0;
+        }
+
+        if (root?["phoneme_id_map"] is not JsonObject map)
+        {
+            return 0;
+        }
+
+        var bad = map.Where(entry => entry.Key.EnumerateRunes().Count() != 1).Select(entry => entry.Key).ToList();
+        if (bad.Count == 0)
+        {
+            return 0;
+        }
+
+        foreach (string key in bad)
+        {
+            map.Remove(key);
+        }
+
+        var options = new JsonSerializerOptions { WriteIndented = true, Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping };
+        File.WriteAllText(configPath, root.ToJsonString(options));
+        return bad.Count;
     }
 }

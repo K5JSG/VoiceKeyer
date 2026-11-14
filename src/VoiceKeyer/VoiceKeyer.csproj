@@ -10,7 +10,7 @@
     <Product>Voice Keyer</Product>
     <AssemblyTitle>Voice Keyer</AssemblyTitle>
     <Company>K5JSG</Company>
-    <Version>1.2.1</Version>
+    <Version>1.3.0</Version>
     <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
     <ApplicationIcon>Assets\logo.ico</ApplicationIcon>
   </PropertyGroup>
@@ -31,6 +31,8 @@
     <!-- ExcludeFromSingleFile: without it a single-file publish swallows piper.exe and its DLLs into VoiceKeyer.exe, where Piper cannot run them. -->
     <Content Include="Bundled\piper\**" Link="piper\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" ExcludeFromSingleFile="true" />
     <Content Include="Bundled\voices\**" Link="voices\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" ExcludeFromSingleFile="true" />
+    <!-- The Colab notebook the voice trainer hands to the user on export. -->
+    <Content Include="..\..\trainer\Piper_Voice_Trainer.ipynb" Link="trainer\Piper_Voice_Trainer.ipynb" CopyToOutputDirectory="PreserveNewest" ExcludeFromSingleFile="true" />
   </ItemGroup>
 
   <ItemGroup>

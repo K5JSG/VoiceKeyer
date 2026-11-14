@@ -89,6 +89,7 @@ Name: "desktopicon"; Description: "Create a &desktop shortcut"; \
 Source: "..\publish\{#MyAppExeName}"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\publish\piper\*"; DestDir: "{app}\piper"; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "..\publish\voices\*"; DestDir: "{app}\voices"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "..\publish\trainer\*"; DestDir: "{app}\trainer"; Flags: ignoreversion
 Source: "..\README.md"; DestDir: "{app}"; Flags: ignoreversion skipifsourcedoesntexist
 Source: "..\License.txt"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\THIRD-PARTY-NOTICES.md"; DestDir: "{app}"; Flags: ignoreversion
