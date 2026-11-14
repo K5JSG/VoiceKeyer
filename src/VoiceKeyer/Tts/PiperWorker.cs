@@ -92,10 +92,29 @@ internal sealed class PiperWorker : IDisposable
             {
                 throw new InvalidOperationException("piper.exe did not produce the voice: " + RecentErrors());
             }
+
+            await WaitUntilReleasedAsync(outputFile, cancellationToken).ConfigureAwait(false);
         }
         finally
         {
             _gate.Release();
+        }
+    }
+
+    /// <summary>Piper prints the path a moment before it has closed the file; wait until the file can be opened.</summary>
+    private static async Task WaitUntilReleasedAsync(string file, CancellationToken cancellationToken)
+    {
+        for (int attempt = 0; attempt < 80; attempt++)
+        {
+            try
+            {
+                using var stream = new FileStream(file, FileMode.Open, FileAccess.Read, FileShare.None);
+                return;
+            }
+            catch (IOException)
+            {
+                await Task.Delay(25, cancellationToken).ConfigureAwait(false);
+            }
         }
     }
 
