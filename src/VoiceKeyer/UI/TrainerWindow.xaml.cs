@@ -166,6 +166,39 @@ public partial class TrainerWindow : Window
         PlayButton.IsEnabled = _dataset.HasClip(_index);
     }
 
+    private void Review_Click(object sender, RoutedEventArgs e)
+    {
+        if (_capture is not null)
+        {
+            return;
+        }
+
+        var findings = ClipReview.Review(_dataset, _prompts);
+        if (findings.Count == 0)
+        {
+            MessageBox.Show(this, "No clip stands out. The recordings look consistent in level, noise and timing.", "Voice trainer");
+            return;
+        }
+
+        string preview = string.Join(Environment.NewLine, findings.Take(8)
+            .Select(f => $"{f.Index + 1:0000}  {_prompts[f.Index]}  -  {f.Reason}"));
+        string more = findings.Count > 8 ? $"{Environment.NewLine}... and {findings.Count - 8} more." : string.Empty;
+        var answer = MessageBox.Show(this,
+            $"{findings.Count} clip(s) are worth recording again:{Environment.NewLine}{Environment.NewLine}{preview}{more}" +
+            $"{Environment.NewLine}{Environment.NewLine}Start the redo list now? Your old takes are kept in redo_backup.",
+            "Voice trainer", MessageBoxButton.YesNo);
+        if (answer != MessageBoxResult.Yes)
+        {
+            return;
+        }
+
+        ClipReview.WriteRedoList(RedoPath, findings);
+        LoadRedoList();
+        _index = StartIndex();
+        _warning = string.Empty;
+        ShowPrompt();
+    }
+
     private void Record_Click(object sender, RoutedEventArgs e)
     {
         if (_capture is null)

@@ -57,9 +57,18 @@ public sealed class DatasetRecorder
         {
             warnings.Add("Clipping - lower the microphone level.");
         }
-        else if (ToDb(peak) < -30)
+        else if (ToDb(peak) >= -3)
         {
-            warnings.Add("Very quiet - raise the microphone level or move closer.");
+            warnings.Add("Very loud - lower the microphone level a little.");
+        }
+        else if (ToDb(peak) < -20)
+        {
+            warnings.Add("Quiet - raise the microphone level or move closer.");
+        }
+
+        if (ClipReview.Measure(samples).PopRatio > ClipReview.PopThreshold)
+        {
+            warnings.Add("Possible pop or thump - move back a little or say P and B softer.");
         }
 
         if (ToDb(noise) > -50)
@@ -193,22 +202,25 @@ public sealed class DatasetRecorder
         return output;
     }
 
+    /// <summary>Reads a mono 16-bit wav as floats.</summary>
+    public static float[] ReadSamples(string path)
+    {
+        using var reader = new WaveFileReader(path);
+        var provider = reader.ToSampleProvider();
+        var all = new List<float>((int)(reader.Length / 2));
+        var buffer = new float[4096];
+        int read;
+        while ((read = provider.Read(buffer)) > 0)
+        {
+            all.AddRange(buffer.AsSpan(0, read).ToArray());
+        }
+
+        return all.ToArray();
+    }
+
     private static byte[] LevelledWav(string path)
     {
-        float[] samples;
-        using (var reader = new WaveFileReader(path))
-        {
-            var provider = reader.ToSampleProvider();
-            var all = new List<float>((int)(reader.Length / 2));
-            var buffer = new float[4096];
-            int read;
-            while ((read = provider.Read(buffer)) > 0)
-            {
-                all.AddRange(buffer.AsSpan(0, read).ToArray());
-            }
-
-            samples = all.ToArray();
-        }
+        float[] samples = ReadSamples(path);
 
         samples = LevelUp(HighPass(samples));
         using var memory = new MemoryStream(44 + samples.Length * 2);

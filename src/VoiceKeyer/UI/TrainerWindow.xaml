@@ -47,6 +47,8 @@
             <Button x:Name="NextButton" Content="Next &#x25B6;" Width="80" Height="34" Margin="8,0,0,0" Click="Next_Click"/>
             <Button Content="Export for training..." Width="150" Height="34" Margin="24,0,0,0" Click="Export_Click"
                     ToolTip="Creates a .zip to upload to the Colab training notebook"/>
+            <Button Content="Check recordings" Width="130" Height="34" Margin="8,0,0,0" Click="Review_Click"
+                    ToolTip="Finds clips worth recording again (pops, noise, too loud or quiet, stumbles) and starts the redo list"/>
             <Button Content="Open folder" Width="90" Height="34" Margin="8,0,0,0" Click="OpenFolder_Click"/>
         </StackPanel>
     </Grid>
